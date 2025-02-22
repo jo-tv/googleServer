@@ -6,9 +6,8 @@ const app = express();
 // 🟢 قائمة الروابط المتاحة للبث
 const streamSources = [
  "http://mo3ad.xyz/5ffwT4Jtdz/p9VfzRvdxK/",
- "http://mutant.arrox.top:80/live/oWg8mm2z2/C1LwyPEFOj/",
- "http://asterix-iptv.club:25461/24SuadViberRazmjena50/SPfbtyeepaup/",
- "http://173.212.193.243:8080/wAfWlqYhLp/vDIyvgtHHf/"
+ "http://xtream-ie.com/mo3ad7756/mo3ad7756/",
+ "http://mutant.arrox.top:80/live/oWg8mm2z2/C1LwyPEFOj/"
 ];
 
 app.get('/ping', (req, res) => {
@@ -16,7 +15,7 @@ app.get('/ping', (req, res) => {
 });
 
 // 🔹 مسار بث القناة
-app.get('/stream/:channel', async (req, res) => {
+app.get('/josef/stream/:channel', async (req, res) => {
  const channel = req.params.channel;
 
  for (let i = 0; i < streamSources.length; i++) {
