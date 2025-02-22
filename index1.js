@@ -1,7 +1,11 @@
-const express = require('express');
-const axios = require('axios');
+const express = require("express");
+const axios = require("axios");
+const { spawn } = require("child_process");
+const path = require("path");
+const fs = require("fs");
 
 const app = express();
+const PORT = 3000;
 
 // 🟢 قائمة الروابط المتاحة للبث
 const streamSources = [
@@ -11,90 +15,79 @@ const streamSources = [
  "http://173.212.193.243:8080/wAfWlqYhLp/vDIyvgtHHf/"
 ];
 
-// دالة لإعادة تشغيل البث عندما يتوقف
-const startStream = async (channel, res) => {
- for (let i = 0; i < streamSources.length; i++) {
-  const originalUrl = `${streamSources[i]}${channel}`;
+// 🔹 مجلد تخزين ملفات MPD المؤقتة
+const OUTPUT_DIR = path.join(__dirname, "output");
+if (!fs.existsSync(OUTPUT_DIR)) fs.mkdirSync(OUTPUT_DIR);
 
-  try {
-   console.log(`🔄 تجربة الرابط: ${originalUrl}`);
+// 🔹 مسار البث بصيغة MPD (DASH)
+app.get("/stream/:channel", async (req, res) => {
+    const channel = req.params.channel;
+    let selectedUrl = null;
 
-   const response = await axios({
-    method: 'get',
-    url: originalUrl,
-    responseType: 'stream',
-    timeout: 60000, // زيادة المهلة لتكون أكبر (60 ثانية)
-   });
+    // 🔄 تجربة الروابط المتاحة
+    for (let i = 0; i < streamSources.length; i++) {
+        const originalUrl = `${streamSources[i]}${channel}`;
 
-   console.log(`✅ البث يعمل من المصدر ${i + 1}`);
-   res.setHeader('Content-Type', 'video/mp2t'); // HLS أو TS
+        try {
+            console.log(`🔄 تجربة الرابط: ${originalUrl}`);
+            const response = await axios.head(originalUrl, { timeout: 5000 });
 
-   let buffer = [];
-   let segmentTime = 15 * 1000; // التحميل المسبق لمدة 15 ثانية
-   let lastLoadedTime = Date.now();
-
-   // تابع لتحميل الأجزاء القادمة مسبقًا
-   const preBufferSegment = async (nextUrl) => {
-    try {
-     const preBuffer = await axios({
-      method: 'get',
-      url: nextUrl,
-      responseType: 'stream',
-     });
-
-     preBuffer.data.on('data', chunk => {
-      console.log(`🟢 جزء جديد قيد التحميل (مسبقًا)...`);
-      buffer.push(chunk); // تخزين الأجزاء القادمة في الذاكرة
-     });
-
-    } catch (err) {
-     console.error(`❌ فشل تحميل الجزء التالي: ${nextUrl}`);
+            if (response.status === 200) {
+                console.log(`✅ المصدر ${i + 1} يعمل!`);
+                selectedUrl = originalUrl;
+                break;
+            }
+        } catch (err) {
+            console.error(`❌ المصدر ${i + 1} لا يعمل، المحاولة التالية...`);
+        }
     }
-   };
 
-   // إرسال الأجزاء بشكل مستمر
-   response.data.on('data', chunk => {
-    console.log(`🟢 جزء جديد قيد التحميل...`);
-    buffer.push(chunk); // تخزين البيانات بشكل مؤقت
-
-    const currentTime = Date.now();
-    if (currentTime - lastLoadedTime > segmentTime) {
-     console.log(`🔄 إرسال البيانات المحملة: ${buffer.length} bytes`);
-     res.write(Buffer.concat(buffer)); // إرسال البيانات جزئيًا
-     buffer = []; // إعادة تعيين البيانات المؤقتة
-     lastLoadedTime = currentTime;
-
-     // تحميل الجزء التالي بشكل مسبق
-     const nextSegmentUrl = `${originalUrl}${parseInt(channel) + 1}.ts`;
-     preBufferSegment(nextSegmentUrl);
+    if (!selectedUrl) {
+        return res.status(500).send("⚠️ جميع المصادر غير متاحة حاليًا");
     }
-   });
 
-   response.data.on('end', () => {
-    if (buffer.length > 0) {
-     console.log(`🔚 إرسال البيانات المتبقية.`);
-     res.write(Buffer.concat(buffer)); // إرسال البيانات المتبقية
-    }
-    res.end(); // إغلاق البث
-    console.log(`📡 انتهى البث`);
-   });
+    // 🔹 إنشاء مسار ملف MPD
+    const outputMPD = path.join(OUTPUT_DIR, `${channel}.mpd`);
 
-   return; // ⬅️ إيقاف البحث بعد العثور على رابط صالح
-  } catch (err) {
-   console.error(`❌ المصدر ${i + 1} لا يعمل، المحاولة التالية...`);
-  }
- }
+    // 🛑 حذف الملفات القديمة قبل إعادة البث
+    if (fs.existsSync(outputMPD)) fs.unlinkSync(outputMPD);
 
- res.status(500).send("⚠️ جميع المصادر غير متاحة حاليًا");
-};
+    // 🚀 تشغيل FFmpeg لتحويل M3U8 إلى MPD
+    const ffmpegArgs = [
+        "-i", selectedUrl,
+        "-map", "0",
+        "-c:v", "libx264",
+        "-c:a", "aac",
+        "-b:v", "2500k",
+        "-b:a", "128k",
+        "-f", "dash",
+        "-seg_duration", "4",
+        "-use_template", "1",
+        "-use_timeline", "1",
+        outputMPD
+    ];
 
-// مسار بث القناة
-app.get('/stream/:channel', async (req, res) => {
- const channel = req.params.channel;
- await startStream(channel, res); // بدء البث من رابط متاح
+    const ffmpegProcess = spawn("ffmpeg", ffmpegArgs);
+
+    ffmpegProcess.stderr.on("data", (data) => {
+        console.log(`FFmpeg: ${data}`);
+    });
+
+    ffmpegProcess.on("close", (code) => {
+        if (code === 0) {
+            console.log(`✅ التحويل ناجح!`);
+        } else {
+            console.error(`❌ فشل التحويل!`);
+        }
+    });
+
+    res.json({ message: "✅ البث بدأ!", mpd_url: `/output/${channel}.mpd` });
 });
 
-// ✅ تشغيل السيرفر على المنفذ 3000
-app.listen(3000, () => {
- console.log("✅ الخادم يعمل على http://localhost:3000");
+// 🔹 تقديم ملفات البث المحولة
+app.use("/output", express.static(OUTPUT_DIR));
+
+// ✅ تشغيل السيرفر
+app.listen(PORT, () => {
+    console.log(`✅ الخادم يعمل على http://localhost:${PORT}`);
 });
