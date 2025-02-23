@@ -5,7 +5,7 @@ const app = express();
 
 // 🟢 قائمة الروابط المتاحة للبث
 const streamSources = [
- "http://xtream-ie.com/mo3ad7756/mo3ad7756/",
+ "http://mo3ad.xyz/VJ5sPbGpvw/PjuDatRDQm/",
  "http://mutant.arrox.top:80/live/oWg8mm2z2/C1LwyPEFOj/"
 ];
 

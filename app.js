@@ -6,7 +6,7 @@ const app = express();
 
 // 🟢 قائمة الروابط المتاحة للبث
 const streamSources = [
- "http://mo3ad.xyz/5ffwT4Jtdz/p9VfzRvdxK/",
+ "http://mo3ad.xyz/VJ5sPbGpvw/PjuDatRDQm/",
  "http://xtream-ie.com/mo3ad7756/mo3ad7756/",
 ];
 
