@@ -5,7 +5,7 @@ const app = express();
 // 🟢 الروابط المتاحة للبث
 const streamSources = [
   "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/",
- "http://pro.ipcover.lol:8080/T3H2XcMqmt7A/jjShbfJwzhV6/",
+ "http://line.din-ott.com/mrwxkx98rt/1h12aju532/",
  "http://mutant.arrox.top:80/live/oWg8mm2z2/C1LwyPEFOj/"
 ];
 
