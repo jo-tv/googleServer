@@ -1,77 +1,154 @@
 const express = require('express');
-const { spawn } = require('child_process');
 const axios = require('axios');
+const fs = require('fs');
+const path = require('path');
 const app = express();
 
-// ✅ الروابط المتاحة للبث
+// 🟢 الروابط المتاحة للبث
 const streamSources = [
-  "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/",
-  "http://sansat.cc:88/angmagloire/3OSUOQZYT5K8SEN/"
+  "http://sansat.cc:88/angmagloire/3OSUOQZYT5K8SEN/",
+  "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/"
 ];
 
-// ✅ مسار اختبار الخادم (Keep-Alive)
-app.get('/ping', (req, res) => {
-  res.send('pong');
-});
+// تأكد من أن مجلد cache موجود
+const cacheDirectory = path.join(__dirname, 'cache');
+if (!fs.existsSync(cacheDirectory)) {
+  fs.mkdirSync(cacheDirectory, { recursive: true });
+  console.log('✅ تم إنشاء مجلد التخزين المؤقت.');
+}
 
-// ✅ مسار بث القناة مع Streamlink
+// 🔹 مسار بث القناة
 app.get('/josef/stream/:channel', async (req, res) => {
   const channel = req.params.channel;
-  let streamFound = false;
 
-  for (const [index, baseUrl] of streamSources.entries()) {
-    const originalUrl = `${baseUrl}${channel}`;
+  let currentPart = 0;  // تتبع الجزء الحالي
+  let isStreaming = false;  // متابعة حالة البث
+
+  // تحقق من إتاحة الرابط
+  for (let i = 0; i < streamSources.length; i++) {
+    const originalUrl = `${streamSources[i]}${channel}`;
 
     try {
-      console.log(`🔄 تجربة المصدر ${index + 1}: ${originalUrl}`);
+      console.log(`🔄 تجربة الرابط: ${originalUrl}`);
 
-      // التحقق من توفر الرابط
-      await axios.head(originalUrl, { timeout: 10000 });
+      // تحميل الجزء الأول
+      const tempFilePath = path.join(cacheDirectory, `${channel}-${currentPart}.ts`);
 
-      console.log(`✅ البث يعمل من المصدر ${index + 1}, بدأ Streamlink...`);
+      // التحقق من وجود الملف المؤقت
+      if (fs.existsSync(tempFilePath)) {
+        console.log(`✅ البث موجود في الذاكرة المؤقتة.`);
+        const stream = fs.createReadStream(tempFilePath);
+        stream.pipe(res, { end: false });
 
-      // تشغيل Streamlink لتحسين البث
-      const streamProcess = spawn('streamlink', [
-        originalUrl,
-        'best',
-        '--stdout', // استخراج البث إلى الإخراج المباشر
-        '--player-args', '--hls-segment-threads=4' // تحسين التخزين المؤقت
-      ]);
+        // بمجرد البث، نبدأ في تحميل الجزء التالي
+        currentPart++;
+        setTimeout(() => {
+          downloadNextPart(channel, currentPart);  // تحميل الجزء التالي في الخلفية
+        }, 1000); // تأخير قليل قبل تحميل الجزء التالي
 
-      // تمرير البيانات إلى العميل
-      streamProcess.stdout.pipe(res);
-      streamFound = true;
+        return; // نوقف العملية بمجرد العثور على الجزء الأول
+      }
 
-      // تسجيل أي خطأ في Streamlink
-      streamProcess.stderr.on('data', (data) => {
-        console.error(`❌ خطأ Streamlink: ${data.toString()}`);
+      // تحميل جزء من البث
+      const response = await axios({
+        method: 'get',
+        url: originalUrl,
+        responseType: 'stream',
+        headers: {
+          'Accept-Encoding': 'gzip, deflate, br', // ضغط البيانات
+          'Range': `bytes=${currentPart * 1048576}-${(currentPart + 1) * 1048576 - 1}`, // طلب جزء من البيانات
+        },
+        timeout: 30000, // زيادة المهلة إلى 30 ثانية
       });
 
-      streamProcess.on('close', (code) => {
-        console.log(`📌 تم إنهاء Streamlink برمز: ${code}`);
+      console.log(`✅ البث يعمل من المصدر ${i + 1}`);
+
+      // حفظ البث في الذاكرة المؤقتة
+      const writer = fs.createWriteStream(tempFilePath);
+      response.data.pipe(writer);
+
+      writer.on('finish', () => {
+        console.log('✅ تم حفظ الجزء في الذاكرة المؤقتة');
+        const stream = fs.createReadStream(tempFilePath);
+        stream.pipe(res, { end: false });
+
+        // تحميل الجزء التالي في الخلفية
+        currentPart++;
+        setTimeout(() => {
+          downloadNextPart(channel, currentPart);  // تحميل الجزء التالي في الخلفية
+        }, 1000); // تأخير قليل قبل تحميل الجزء التالي
       });
 
-      break; // التوقف عند أول رابط ناجح
+      writer.on('error', (err) => {
+        console.error('❌ حدث خطأ أثناء حفظ الملف المؤقت:', err);
+      });
+
     } catch (err) {
-      console.error(`❌ المصدر ${index + 1} فشل: ${err.message}`);
+      console.error(`❌ المصدر ${i + 1} لا يعمل:`, err.message);
+      if (err.response && err.response.status === 404) {
+        console.log('❌ حدث خطأ 404: الجزء غير موجود.');
+        // إعادة المحاولة بعد 5 ثوانٍ
+        setTimeout(() => {
+          console.log(`🔄 إعادة المحاولة لتحميل الجزء من المصدر ${i + 1}`);
+          downloadNextPart(channel, currentPart); // إعادة المحاولة
+        }, 5000);
+      } else if (err.response) {
+        console.log(`🔴 رمز الاستجابة: ${err.response.status}`);
+      } else {
+        console.log(`🔴 حدث خطأ غير متوقع: ${err.message}`);
+      }
     }
   }
 
-  if (!streamFound) {
-    res.status(502).send("⚠️ جميع مصادر البث غير متاحة حاليًا");
-  }
+  res.status(500).send("⚠️ جميع المصادر غير متاحة حاليًا");
 });
 
-// ✅ إبقاء الخادم نشطًا عبر Keep-Alive
-setInterval(async () => {
+// دالة تحميل الجزء التالي في الخلفية
+async function downloadNextPart(channel, partNumber) {
   try {
-    await axios.get('https://googleserver-lga6.onrender.com/ping');
-    console.log('🔄 Keep-Alive: Ping ناجح');
-  } catch (err) {
-    console.error('⚠️ Keep-Alive: فشل الاتصال', err.message);
-  }
-}, 5 * 60 * 1000); // كل 5 دقائق
+    const tempFilePath = path.join(cacheDirectory, `${channel}-${partNumber}.ts`);
+    const originalUrl = `http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/${channel}`;  // تحديث الرابط حسب الحاجة
 
-// ✅ تشغيل الخادم
+    const response = await axios({
+      method: 'get',
+      url: originalUrl,
+      responseType: 'stream',
+      headers: {
+        'Accept-Encoding': 'gzip, deflate, br',
+        'Range': `bytes=${partNumber * 1048576}-${(partNumber + 1) * 1048576 - 1}`,
+      },
+      timeout: 30000,
+    });
+
+    console.log(`🔄 تحميل الجزء ${partNumber}`);
+
+    const writer = fs.createWriteStream(tempFilePath);
+    response.data.pipe(writer);
+
+    writer.on('finish', () => {
+      console.log(`✅ تم حفظ الجزء ${partNumber} في الذاكرة المؤقتة`);
+      // مسح الجزء السابق
+      const previousPartFilePath = path.join(cacheDirectory, `${channel}-${partNumber - 1}.ts`);
+      if (fs.existsSync(previousPartFilePath)) {
+        fs.unlinkSync(previousPartFilePath);
+        console.log(`✅ تم مسح الجزء السابق (${partNumber - 1})`);
+      }
+    });
+
+    writer.on('error', (err) => {
+      console.error(`❌ حدث خطأ أثناء حفظ الجزء ${partNumber}:`, err);
+    });
+
+  } catch (err) {
+    console.error(`❌ حدث خطأ أثناء تحميل الجزء التالي:`, err.message);
+    if (err.response && err.response.status === 404) {
+      console.log(`❌ خطأ 404: الجزء غير موجود.`);
+    } else {
+      console.log(`❌ حدث خطأ غير متوقع: ${err.message}`);
+    }
+  }
+}
+
+// تشغيل الخادم على المنفذ 3000
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 الخادم يعمل على http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ الخادم يعمل على http://localhost:${PORT}`));

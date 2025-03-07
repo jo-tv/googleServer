@@ -1,77 +1,60 @@
 const express = require('express');
-const { spawn } = require('child_process');
 const axios = require('axios');
 const app = express();
 
-// ✅ الروابط المتاحة للبث
+// 🟢 الروابط المتاحة للبث
 const streamSources = [
   "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/",
-  "http://sansat.cc:88/angmagloire/3OSUOQZYT5K8SEN/"
+ "http://line.din-ott.com/mrwxkx98rt/1h12aju532/"
 ];
 
-// ✅ مسار اختبار الخادم (Keep-Alive)
 app.get('/ping', (req, res) => {
-  res.send('pong');
+ res.send('pong'); // استجابة سريعة وخفيفة
 });
 
-// ✅ مسار بث القناة مع Streamlink
+// 🔹 مسار بث القناة
 app.get('/josef/stream/:channel', async (req, res) => {
   const channel = req.params.channel;
-  let streamFound = false;
 
-  for (const [index, baseUrl] of streamSources.entries()) {
-    const originalUrl = `${baseUrl}${channel}`;
+  // تحقق من إتاحة الرابط
+  for (let i = 0; i < streamSources.length; i++) {
+    const originalUrl = `${streamSources[i]}${channel}`;
 
     try {
-      console.log(`🔄 تجربة المصدر ${index + 1}: ${originalUrl}`);
+      console.log(`🔄 تجربة الرابط: ${originalUrl}`);
 
-      // التحقق من توفر الرابط
-      await axios.head(originalUrl, { timeout: 10000 });
-
-      console.log(`✅ البث يعمل من المصدر ${index + 1}, بدأ Streamlink...`);
-
-      // تشغيل Streamlink لتحسين البث
-      const streamProcess = spawn('streamlink', [
-        originalUrl,
-        'best',
-        '--stdout', // استخراج البث إلى الإخراج المباشر
-        '--player-args', '--hls-segment-threads=4' // تحسين التخزين المؤقت
-      ]);
-
-      // تمرير البيانات إلى العميل
-      streamProcess.stdout.pipe(res);
-      streamFound = true;
-
-      // تسجيل أي خطأ في Streamlink
-      streamProcess.stderr.on('data', (data) => {
-        console.error(`❌ خطأ Streamlink: ${data.toString()}`);
+      // قم بتحديد رؤوس الطلب لتقليل استهلاك البيانات عبر دعم الضغط
+      const response = await axios({
+        method: 'get',
+        url: originalUrl,
+        responseType: 'stream',
+        headers: {
+          'Accept-Encoding': 'gzip, deflate, br', // ضغط البيانات
+        },
+        timeout: 30000, // زيادة المهلة إلى 30 ثانية
       });
 
-      streamProcess.on('close', (code) => {
-        console.log(`📌 تم إنهاء Streamlink برمز: ${code}`);
-      });
-
-      break; // التوقف عند أول رابط ناجح
+      console.log(`✅ البث يعمل من المصدر ${i + 1}`);
+      
+      // إرسال البيانات المضغوطة إلى المستخدم
+      response.data.pipe(res);
+      return; // نوقف العملية بمجرد العثور على رابط شغال
     } catch (err) {
-      console.error(`❌ المصدر ${index + 1} فشل: ${err.message}`);
+      console.error(`❌ المصدر ${i + 1} لا يعمل، المحاولة التالية...`);
     }
   }
 
-  if (!streamFound) {
-    res.status(502).send("⚠️ جميع مصادر البث غير متاحة حاليًا");
-  }
+  res.status(500).send("⚠️ جميع المصادر غير متاحة حاليًا");
 });
 
-// ✅ إبقاء الخادم نشطًا عبر Keep-Alive
-setInterval(async () => {
-  try {
-    await axios.get('https://googleserver-lga6.onrender.com/ping');
-    console.log('🔄 Keep-Alive: Ping ناجح');
-  } catch (err) {
-    console.error('⚠️ Keep-Alive: فشل الاتصال', err.message);
-  }
+setInterval(() => {
+ axios.get('https://googleserver-lga6.onrender.com/ping')
+  .then(() => console.log('🔄 Keep-Alive Ping Sent'))
+  .catch(() => console.log('⚠️ Keep-Alive Failed'));
 }, 5 * 60 * 1000); // كل 5 دقائق
 
-// ✅ تشغيل الخادم
+
+
+// تشغيل الخادم على المنفذ 3000
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 الخادم يعمل على http://localhost:${PORT}`));
+app.listen(PORT, () => console.log(`✅ الخادم يعمل على http://localhost:${PORT}`));
