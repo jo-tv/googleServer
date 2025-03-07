@@ -1,46 +1,77 @@
 const express = require('express');
+const { spawn } = require('child_process');
 const axios = require('axios');
-
 const app = express();
 
-// 🟢 قائمة الروابط المتاحة للبث
+// ✅ الروابط المتاحة للبث
 const streamSources = [
   "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/",
-  "http://pro.ipcover.lol:8080/T3H2XcMqmt7A/jjShbfJwzhV6/",
-  "http://mutant.arrox.top:80/live/oWg8mm2z2/C1LwyPEFOj/"
+  "http://sansat.cc:88/angmagloire/3OSUOQZYT5K8SEN/"
 ];
 
-// 🔹 رابط الشعار (استبدله برابط الشعار الخاص بك)
-const logoUrl = "https://i.postimg.cc/d0w5hXdb/watch-Arri-re-plan-virtuel-de-Zoom.gif";
+// ✅ مسار اختبار الخادم (Keep-Alive)
+app.get('/ping', (req, res) => {
+  res.send('pong');
+});
 
-// 🔸 توجيه المستخدم إلى Xpola Player
-app.get('/josef/xpola/:channel', async (req, res) => {
+// ✅ مسار بث القناة مع Streamlink
+app.get('/josef/stream/:channel', async (req, res) => {
   const channel = req.params.channel;
+  let streamFound = false;
 
-  for (let i = 0; i < streamSources.length; i++) {
-    const streamUrl = `${streamSources[i]}${channel}`;
+  for (const [index, baseUrl] of streamSources.entries()) {
+    const originalUrl = `${baseUrl}${channel}`;
 
     try {
-      console.log(`🔄 تجربة الرابط: ${streamUrl}`);
+      console.log(`🔄 تجربة المصدر ${index + 1}: ${originalUrl}`);
 
-      // التحقق من عمل الرابط
-      await axios.head(streamUrl, { timeout: 10000 });
+      // التحقق من توفر الرابط
+      await axios.head(originalUrl, { timeout: 10000 });
 
-      console.log(`✅ البث يعمل من المصدر ${i + 1}`);
+      console.log(`✅ البث يعمل من المصدر ${index + 1}, بدأ Streamlink...`);
 
-      // تمرير الرابط إلى مشغل Xpola مع الشعار
-      const xpolaLink = `intent://play?url=${encodeURIComponent(streamUrl)}&logo=${encodeURIComponent(logoUrl)}#Intent;package=com.xpola.player;end`;
-      
-      return res.redirect(xpolaLink);
+      // تشغيل Streamlink لتحسين البث
+      const streamProcess = spawn('streamlink', [
+        originalUrl,
+        'best',
+        '--stdout', // استخراج البث إلى الإخراج المباشر
+        '--player-args', '--hls-segment-threads=4' // تحسين التخزين المؤقت
+      ]);
+
+      // تمرير البيانات إلى العميل
+      streamProcess.stdout.pipe(res);
+      streamFound = true;
+
+      // تسجيل أي خطأ في Streamlink
+      streamProcess.stderr.on('data', (data) => {
+        console.error(`❌ خطأ Streamlink: ${data.toString()}`);
+      });
+
+      streamProcess.on('close', (code) => {
+        console.log(`📌 تم إنهاء Streamlink برمز: ${code}`);
+      });
+
+      break; // التوقف عند أول رابط ناجح
     } catch (err) {
-      console.error(`❌ المصدر ${i + 1} لا يعمل، المحاولة التالية...`);
+      console.error(`❌ المصدر ${index + 1} فشل: ${err.message}`);
     }
   }
 
-  res.status(500).send("⚠️ جميع المصادر غير متاحة حاليًا");
+  if (!streamFound) {
+    res.status(502).send("⚠️ جميع مصادر البث غير متاحة حاليًا");
+  }
 });
 
+// ✅ إبقاء الخادم نشطًا عبر Keep-Alive
+setInterval(async () => {
+  try {
+    await axios.get('https://googleserver-lga6.onrender.com/ping');
+    console.log('🔄 Keep-Alive: Ping ناجح');
+  } catch (err) {
+    console.error('⚠️ Keep-Alive: فشل الاتصال', err.message);
+  }
+}, 5 * 60 * 1000); // كل 5 دقائق
+
 // ✅ تشغيل الخادم
-app.listen(3000, () => {
-  console.log("✅ الخادم يعمل على http://localhost:3000");
-});
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => console.log(`🚀 الخادم يعمل على http://localhost:${PORT}`));
