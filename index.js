@@ -48,7 +48,7 @@ app.get('/josef/stream/:channel', async (req, res) => {
 });
 
 setInterval(() => {
- axios.get('https://googleserver-lga6.onrender.com/ping')
+ axios.get('https://googleserver-d4w5.onrender.com/ping')
   .then(() => console.log('🔄 Keep-Alive Ping Sent'))
   .catch(() => console.log('⚠️ Keep-Alive Failed'));
 }, 5 * 60 * 1000); // كل 5 دقائق
