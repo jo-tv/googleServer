@@ -5,6 +5,7 @@ const app = express();
 // 🟢 الروابط المتاحة للبث
 const streamSources = [
   "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/",
+  "http://live.moodtv.xyz:2052/josefuccef015/josefuccef/",
  "http://line.din-ott.com/mrwxkx98rt/1h12aju532/"
 ];
 
