@@ -6,7 +6,8 @@ const app = express();
 
 // 🟢 مصادر البث
 const streamSources = [
-  "http://no0rqpwo9qdbar.shurty.me:25461/93p6E6b0OG/918311183993/"
+  "http://no0rqpwo9qdbar.shurty.me:25461/93p6E6b0OG/918311183993/",
+  "http://s1.faster4k.run.place:25461/333CD/333CD/"
 ];
 
 const { LRUCache } = require('lru-cache');
