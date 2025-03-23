@@ -5,9 +5,7 @@ const app = express();
 // 🟢 الروابط المتاحة للبث
 const streamSources = [
   "http://mo3ad.xyz/U9pXkj6ZCG/KZXN37xjz7/",
-  "http://live.moodtv.xyz:2052/josefuccef015/josefuccef/",
- "http://line.din-ott.com/mrwxkx98rt/1h12aju532/",
- "http://mutant.arrox.top:80/live/oWg8mm2z2/C1LwyPEFOj/"
+ "http://line.din-ott.com/mrwxkx98rt/1h12aju532/"
 ];
 
 app.get('/ping', (req, res) => {
@@ -50,7 +48,7 @@ app.get('/josef/stream/:channel', async (req, res) => {
 });
 
 setInterval(() => {
- axios.get('https://googleserver-lga6.onrender.com/ping')
+ axios.get('https://googleserver-d4w5.onrender.com/ping')
   .then(() => console.log('🔄 Keep-Alive Ping Sent'))
   .catch(() => console.log('⚠️ Keep-Alive Failed'));
 }, 5 * 60 * 1000); // كل 5 دقائق
