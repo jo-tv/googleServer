@@ -7,6 +7,7 @@ const app = express();
 // 🟢 مصادر البث
 const streamSources = [
   "http://no0rqpwo9qdbar.shurty.me:25461/93p6E6b0OG/918311183993/",
+  "http://teledunet.com:8080/tdn/tdn/",
   "http://xtream-ie.com:80/mo3ad7791/mo3ad7791/"
 ];
 

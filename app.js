@@ -4,8 +4,7 @@ const app = express();
 
 // 🟢 الروابط المتاحة للبث
 const streamSources = [
-  "http://xtream-ie.com:80/mo3ad7791/mo3ad7791/",
- "http://line.din-ott.com/mrwxkx98rt/1h12aju532/"
+  "http://xtream-ie.com:80/mo3ad7791/mo3ad7791/"
 ];
 
 app.get('/ping', (req, res) => {
