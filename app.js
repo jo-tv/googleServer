@@ -4,6 +4,7 @@ const app = express();
 
 // 🟢 الروابط المتاحة للبث
 const streamSources = [
+ "http://no0rqpwo9qdbar.shurty.me:25461/93p6E6b0OG/918311183993/",
   "http://mo3ad.xyz/live/mo3ad500w/mo3ad500w/"
 ];
 
