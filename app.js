@@ -4,7 +4,7 @@ const app = express();
 
 // 🟢 الروابط المتاحة للبث
 const streamSources = [
-  "http://xtream-ie.com:80/mo3ad7791/mo3ad7791/"
+  "http://mo3ad.xyz/live/mo3ad500w/mo3ad500w/"
 ];
 
 app.get('/ping', (req, res) => {

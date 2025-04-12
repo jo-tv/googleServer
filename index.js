@@ -7,7 +7,7 @@ const app = express();
 // 🟢 مصادر البث
 const streamSources = [
   "http://no0rqpwo9qdbar.shurty.me:25461/93p6E6b0OG/918311183993/",
-  "http://xtream-ie.com:80/mo3ad7791/mo3ad7791/"
+  "http://mo3ad.xyz/live/mo3ad500w/mo3ad500w/"
 ];
 
 const { LRUCache } = require('lru-cache');
